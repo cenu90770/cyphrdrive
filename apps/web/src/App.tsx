@@ -35,7 +35,7 @@ export default function App() {
         setAdminToken(adminAuth.accessToken);
       } catch (err: any) {
         console.error('Auto-login failed:', err);
-        setAuthError('Authentication failed: Ensure your backend is running on port 3000.');
+          setAuthError(`Authentication Error:${err.message}`);
       }
     }
 
