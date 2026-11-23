@@ -43,6 +43,13 @@ app.get(
 
 // --- PROTECTED FLEET ADMIN & SUPER ADMIN ROUTES (FR-11.1, FR-8.1, FR-12) ---
 app.get(
+  "/api/v1/admin/fleet/vehicles",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.getFleetVehilces,
+);
+
+app.get(
   "/api/v1/admin/fleet/live-map",
   authenticateToken,
   requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
