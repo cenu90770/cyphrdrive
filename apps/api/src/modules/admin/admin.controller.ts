@@ -71,6 +71,110 @@ export class AdminController {
   }
 
   /**
+   * POST /api/v1/admin/fleet/vehicles
+   * Onboards a new vehicle with technical data, leasing, insurance and rental info (FR-6.1, FR-6.7)
+   */
+  public static async createVehicle(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const {
+        brand,
+        model,
+        year = new Date().getFullYear(),
+        category = "COMPACT",
+        transmission = "MANUAL",
+        fuelType = "GASOLINE",
+        ratePerDay,
+        licensePlate,
+        vin,
+        specs = {},
+        branchId,
+        photos = [],
+      } = req.body;
+
+      if (!brand || !model || !ratePerDay || !licensePlate) {
+        res
+          .status(400)
+          .json({
+            error: "Brand, model, daily rate, and license plate are required.",
+          });
+        return;
+      }
+
+      // Default to fleet admin's primary assigned branch if not explicitly provided
+      const targetBranchId =
+        branchId || (req.user!.branchIds && req.user!.branchIds[0]);
+
+      if (!targetBranchId) {
+        res
+          .status(400)
+          .json({
+            error:
+              "A valid branch assignment is required for vehicle onboarding.",
+          });
+        return;
+      }
+
+      // Generate random VIN if not provided
+      const finalVin =
+        vin ||
+        `VIN${Math.random().toString(36).substring(2, 12).toUpperCase()}99`;
+
+      const insertQuery = `
+        INSERT INTO vehicles (
+          branch_id, vin, license_plate, make, model, year, category,
+          transmission, fuel_type, base_daily_rate, specs, photos, status
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'AVAILABLE' 
+        ) RETURNING *;
+      `;
+
+      const result = await pool.query(insertQuery, [
+        targetBranchId,
+        finalVin,
+        licensePlate,
+        brand,
+        model,
+        parseInt(year, 10),
+        category,
+        transmission.toUpperCase().includes("AUTO") ? "AUTOMATIC" : "MANUAL",
+        fuelType.toUpperCase().includes("DIESEL")
+          ? "DIESEL"
+          : fuelType.toUpperCase().includes("ELEC")
+            ? "ELECTRIC"
+            : "GASOLINE",
+        parseFloat(ratePerDay),
+        JSON.stringify(specs),
+        photos.length > 0
+          ? photos
+          : [
+              "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=600&q=80",
+            ],
+      ]);
+
+      // Audit Log Entry (NFR-7.1)
+      await pool.query(
+        `INSERT INTO audit_logs (
+          actor_id, actor_role, action, resource_type, resource_id, ip_address, changes
+        ) VALUES ($1, $2, 'VEHICLE_ONBOARDED', 'VEHICLE', $3, '127.0.0.1', $4)`,
+        [
+          req.user!.userId,
+          req.user!.role,
+          result.rows[0].id,
+          JSON.stringify({ brand, model, licensePlate, ratePerDay }),
+        ],
+      );
+
+      res.status(201).json(result.rows[0]);
+    } catch (err: any) {
+      console.error("[AdminController] Vehicle Onboarding Error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
    * Fleet Admin Live Map Data (FR-11.1)
    */
   public static async getLiveFleetMap(
