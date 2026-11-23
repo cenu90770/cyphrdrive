@@ -5,6 +5,7 @@ import { AdminHeader } from './components/AdminHeader';
 import { FleetTable } from './components/FleetTable';
 import { FleetGrid } from './components/FleetGrid';
 import { VehicleDetailsView } from './components/VehicleDetailsView';
+import { VehicleOnboardingWizard } from './components/VehicleOnboardingWizard';
 import { FleetVehicle } from './data/fleetData';
 import { apiRequest } from './lib/api';
 
@@ -12,6 +13,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('fleet');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [selectedVehicle, setSelectedVehicle] = useState<FleetVehicle | null>(null);
+  const [isOnboarding, setIsOnboarding] = useState<boolean>(false);
   const [showFilterBar, setShowFilterBar] = useState<boolean>(true);
 
   // Live Data States
@@ -25,7 +27,7 @@ export default function App() {
   const [dateFrom, setDateFrom] = useState('20.07.2026');
   const [dateTo, setDateTo] = useState('31.12.2026');
 
-  // 1. Authenticate Fleet Admin on mount
+  // Authenticate Fleet Admin on mount
   useEffect(() => {
     async function loginFleetAdmin() {
       try {
@@ -46,7 +48,7 @@ export default function App() {
     loginFleetAdmin();
   }, []);
 
-  // 2. Fetch live fleet data from PostgreSQL via Backend API
+  // Fetch live fleet data from backend API
   const fetchFleetVehicles = useCallback(async () => {
     if (!adminToken) return;
     setLoading(true);
@@ -59,10 +61,9 @@ export default function App() {
         adminToken
       );
 
-      // Map backend database rows to UI FleetVehicle type
       const mappedVehicles: FleetVehicle[] = data.vehicles.map((v, index) => ({
-        id: v.id.slice(0, 8), // Clean readable short ID
-        ref: `CD-${String(index + 1).padStart(3, '0')}`,
+        id: v.id.slice(0, 8),
+        ref: v.specs?.vehicleRef || `CD-${String(index + 1).padStart(3, '0')}`,
         brand: v.brand,
         model: v.model,
         transmission: v.transmission,
@@ -80,9 +81,9 @@ export default function App() {
           largeBags: v.specs?.largeBags || 1,
           smallBags: v.specs?.smallBags || 1,
         },
-        leasing: {
+        leasing: v.specs?.leasing || {
           provider: 'Tunisie Leasing SA',
-          contractRef: `LS-${v.vin.slice(0, 6)}`,
+          contractRef: 'LS8776A',
           start: '04.03.2026',
           end: '04.03.2029',
           type: 'Full amortisation',
@@ -90,9 +91,9 @@ export default function App() {
           monthlyCharge: '1.928,88 TND',
           amount: '86.800,00 TND',
         },
-        insurance: {
+        insurance: v.specs?.insurance || {
           provider: 'Tunisie Assurance SA',
-          contractRef: `TAL-${v.vin.slice(0, 6)}`,
+          contractRef: 'TAL5680776',
           start: '04.03.2026',
           end: '-',
           type: 'Liability coverage',
@@ -115,7 +116,6 @@ export default function App() {
     }
   }, [adminToken, fetchFleetVehicles]);
 
-  // Filter vehicles by category
   const filteredVehicles = vehicles.filter((v) => {
     if (categoryFilter === 'all') return true;
     return v.brand.toLowerCase().includes(categoryFilter) || v.model.toLowerCase().includes(categoryFilter);
@@ -124,6 +124,7 @@ export default function App() {
   const getBreadcrumbs = () => {
     if (activeTab === 'dashboard') return ['Dashboard'];
     if (activeTab === 'fleet') {
+      if (isOnboarding) return ['Fleet', 'New Item'];
       if (selectedVehicle) return ['Fleet', 'Vehicle Details'];
       return ['Fleet', 'Overview'];
     }
@@ -135,6 +136,7 @@ export default function App() {
       <AdminSidebar activeTab={activeTab} onSelectTab={(tab) => {
         setActiveTab(tab);
         setSelectedVehicle(null);
+        setIsOnboarding(false);
       }} />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -147,12 +149,15 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === 'fleet' && !selectedVehicle && (
+          {activeTab === 'fleet' && !selectedVehicle && !isOnboarding && (
             <div className="space-y-6">
               {/* Fleet Toolbar (pages 15 & 16) */}
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center space-x-3">
-                  <button className="px-4 py-2 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-xs rounded-xl flex items-center transition shadow-sm">
+                  <button 
+                    onClick={() => setIsOnboarding(true)}
+                    className="px-4 py-2 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-xs rounded-xl flex items-center transition shadow-sm"
+                  >
                     <Plus className="w-4 h-4 mr-1.5" /> Add Item
                   </button>
 
@@ -165,6 +170,7 @@ export default function App() {
                         className="border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700"
                       >
                         <option value="all">all</option>
+                        <option value="kia">Kia</option>
                         <option value="bmw">BMW</option>
                         <option value="audi">Audi</option>
                         <option value="volkswagen">Volkswagen</option>
@@ -186,7 +192,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Right controls: Refresh, Filter toggle, View Mode toggle, Counter */}
                 <div className="flex items-center space-x-3">
                   <button 
                     onClick={fetchFleetVehicles}
@@ -203,7 +208,6 @@ export default function App() {
                     <Filter className="w-4 h-4" />
                   </button>
 
-                  {/* Grid / Table Toggle */}
                   <div className="flex border border-slate-200 rounded-lg overflow-hidden bg-white">
                     <button
                       onClick={() => setViewMode('table')}
@@ -219,14 +223,12 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Live Fleet Counter */}
                   <span className="text-2xl font-black text-slate-900">
                     {filteredVehicles.length} <span className="text-sm font-normal text-slate-400">/50</span>
                   </span>
                 </div>
               </div>
 
-              {/* View Rendering */}
               {loading && vehicles.length === 0 ? (
                 <div className="py-20 text-center text-slate-400 text-sm font-medium">
                   Loading fleet data from database...
@@ -239,13 +241,27 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === 'fleet' && selectedVehicle && (
+          {/* Vehicle Onboarding Wizard (Pages 2–9) */}
+          {activeTab === 'fleet' && isOnboarding && adminToken && (
+            <VehicleOnboardingWizard
+              adminToken={adminToken}
+              onCancel={() => setIsOnboarding(false)}
+              onSuccess={() => {
+                setIsOnboarding(false);
+                fetchFleetVehicles();
+              }}
+            />
+          )}
+
+          {/* Vehicle Details Subview */}
+          {activeTab === 'fleet' && selectedVehicle && !isOnboarding && (
             <VehicleDetailsView 
               vehicle={selectedVehicle} 
               onBack={() => setSelectedVehicle(null)} 
             />
           )}
 
+          {/* Other Tabs */}
           {activeTab !== 'fleet' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
