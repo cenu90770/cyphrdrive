@@ -49,6 +49,13 @@ app.get(
   AdminController.getFleetVehilces,
 );
 
+app.post(
+  "/api/v1/admin/fleet/vehicles",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.createVehicle,
+);
+
 app.get(
   "/api/v1/admin/fleet/live-map",
   authenticateToken,
