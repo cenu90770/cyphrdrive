@@ -47,7 +47,9 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
           <tbody className="divide-y divide-slate-100">
             {vehicles.map((v) => (
               <tr key={v.id} className="hover:bg-slate-50/50 transition">
-                <td className="py-3 px-4 font-mono font-medium text-slate-900">{v.id}</td>
+                <td className="py-3 px-4 font-mono font-medium text-slate-900">
+                  {v.displayId || v.id.slice(-6)}
+                </td>
                 <td className="py-3 px-3 font-semibold text-slate-700">{v.ref}</td>
                 <td className="py-3 px-3 text-slate-900 font-medium">{v.brand}</td>
                 <td className="py-3 px-3 text-slate-700">{v.model}</td>
