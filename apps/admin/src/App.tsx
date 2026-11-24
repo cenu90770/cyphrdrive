@@ -7,12 +7,13 @@ import { FleetGrid } from './components/FleetGrid';
 import { VehicleDetailsView } from './components/VehicleDetailsView';
 import { VehicleOnboardingWizard } from './components/VehicleOnboardingWizard';
 import { AdminBookingWizard } from './components/AdminBookingWizard';
+import { BookingManagement } from './components/BookingManagement';
 import { FleetVehicle } from './data/fleetData';
 import { apiRequest } from './lib/api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('fleet');
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid'); // Default to grid to test Book overlay
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
   const [selectedVehicle, setSelectedVehicle] = useState<FleetVehicle | null>(null);
   const [bookingVehicle, setBookingVehicle] = useState<FleetVehicle | null>(null);
   const [isOnboarding, setIsOnboarding] = useState<boolean>(false);
@@ -64,8 +65,8 @@ export default function App() {
       );
 
       const mappedVehicles: FleetVehicle[] = data.vehicles.map((v, index) => ({
-        id: v.id, // Full UUID guarantees 100% unique React keys & valid DB foreign keys
-        displayId: v.id.replace(/-/g, '').slice(-6).toUpperCase(), // Clean 6-char display ID
+        id: v.id,
+        displayId: v.id.replace(/-/g, '').slice(-6).toUpperCase(),
         ref: v.specs?.vehicleRef || `SB${String(index + 2).padStart(3, '0')}`,
         brand: v.brand,
         model: v.model,
@@ -98,7 +99,6 @@ export default function App() {
     }
   }, [adminToken, fetchFleetVehicles]);
 
-  // Status Filter ('all', 'available', 'booked', 'picked-up', 'service', 'issue')
   const filteredVehicles = vehicles.filter((v) => {
     if (statusFilter === 'all') return true;
     return v.status.toLowerCase() === statusFilter.toLowerCase();
@@ -118,24 +118,16 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      {/* 1. Left Sidebar */}
       <AdminSidebar 
         activeTab={activeTab} 
         onSelectTab={(tab) => {
           setActiveTab(tab);
           setSelectedVehicle(null);
           setIsOnboarding(false);
-          if (tab === 'booking') {
-            // Default to first available car if booking tab is clicked directly
-            const availableCar = vehicles.find((v) => v.status === 'available') || vehicles[0];
-            setBookingVehicle(availableCar || null);
-          } else {
-            setBookingVehicle(null);
-          }
+          setBookingVehicle(null);
         }} 
       />
 
-      {/* 2. Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader breadcrumbs={getBreadcrumbs()} />
 
@@ -146,10 +138,9 @@ export default function App() {
             </div>
           )}
 
-          {/* VIEW A: FLEET MANAGEMENT */}
+          {/* VIEW 1: FLEET OVERVIEW */}
           {activeTab === 'fleet' && !selectedVehicle && !isOnboarding && !bookingVehicle && (
             <div className="space-y-6">
-              {/* Toolbar */}
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center space-x-3">
                   <button 
@@ -159,7 +150,6 @@ export default function App() {
                     <Plus className="w-4 h-4 mr-1.5" /> Add Item
                   </button>
 
-                  {/* Status Dropdown */}
                   {showFilterBar && (
                     <div className="flex items-center space-x-2">
                       <select 
@@ -175,71 +165,57 @@ export default function App() {
                         <option value="issue">issue</option>
                       </select>
 
-                      <input 
-                        type="text" 
-                        value={dateFrom} 
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-xs font-mono text-slate-700 w-28 text-center" 
-                      />
-                      <input 
-                        type="text" 
-                        value={dateTo} 
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-xs font-mono text-slate-700 w-28 text-center" 
-                      />
+                      <input type="text" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-xs font-mono text-slate-700 w-28 text-center" />
+                      <input type="text" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-xs font-mono text-slate-700 w-28 text-center" />
                     </div>
                   )}
                 </div>
 
-                {/* Right Toolbar Controls */}
                 <div className="flex items-center space-x-3">
                   <button onClick={fetchFleetVehicles} className="p-2 border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-600">
                     <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                   </button>
-
                   <button onClick={() => setShowFilterBar(!showFilterBar)} className="p-2 border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-600">
                     <Filter className="w-4 h-4" />
                   </button>
-
                   <div className="flex border border-slate-200 rounded-lg overflow-hidden bg-white">
-                    <button
-                      onClick={() => setViewMode('table')}
-                      className={`p-2 transition ${viewMode === 'table' ? 'bg-slate-200 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
+                    <button onClick={() => setViewMode('table')} className={`p-2 transition ${viewMode === 'table' ? 'bg-slate-200 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>
                       <List className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className={`p-2 transition ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
+                    <button onClick={() => setViewMode('grid')} className={`p-2 transition ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>
                       <LayoutGrid className="w-4 h-4" />
                     </button>
                   </div>
-
                   <span className="text-2xl font-black text-slate-900">
                     {filteredVehicles.length} <span className="text-sm font-normal text-slate-400">/50</span>
                   </span>
                 </div>
               </div>
 
-              {/* View Rendering */}
-              {loading && vehicles.length === 0 ? (
-                <div className="py-20 text-center text-slate-400 text-sm font-medium">
-                  Loading vehicles...
-                </div>
-              ) : viewMode === 'table' ? (
+              {viewMode === 'table' ? (
                 <FleetTable vehicles={filteredVehicles} onSelectVehicle={setSelectedVehicle} />
               ) : (
                 <FleetGrid 
                   vehicles={filteredVehicles} 
                   onSelectVehicle={setSelectedVehicle}
-                  onBookVehicle={(v) => setBookingVehicle(v)} // Triggers "Book" button
+                  onBookVehicle={(v) => setBookingVehicle(v)}
                 />
               )}
             </div>
           )}
 
-          {/* VIEW B: 4-STEP BOOKING WIZARD & CONFIRMATION */}
+          {/* VIEW 2: BOOKINGS LIST & RETURN MANAGEMENT (Tab: KeyRound) */}
+          {activeTab === 'booking' && !bookingVehicle && adminToken && (
+            <BookingManagement
+              adminToken={adminToken}
+              onNewBookingClick={() => {
+                const car = vehicles.find((v) => v.status === 'available') || vehicles[0];
+                setBookingVehicle(car);
+              }}
+            />
+          )}
+
+          {/* VIEW 3: 4-STEP BOOKING WIZARD */}
           {bookingVehicle && adminToken && (
             <AdminBookingWizard
               vehicle={bookingVehicle}
@@ -247,13 +223,13 @@ export default function App() {
               onCancel={() => setBookingVehicle(null)}
               onBookingCompleted={() => {
                 setBookingVehicle(null);
-                setActiveTab('fleet');
+                setActiveTab('booking');
                 fetchFleetVehicles();
               }}
             />
           )}
 
-          {/* VIEW C: ONBOARDING WIZARD */}
+          {/* VIEW 4: ONBOARDING WIZARD */}
           {activeTab === 'fleet' && isOnboarding && adminToken && (
             <VehicleOnboardingWizard
               adminToken={adminToken}
@@ -265,7 +241,7 @@ export default function App() {
             />
           )}
 
-          {/* VIEW D: VEHICLE DETAILS */}
+          {/* VIEW 5: VEHICLE DETAILS */}
           {activeTab === 'fleet' && selectedVehicle && !isOnboarding && !bookingVehicle && (
             <VehicleDetailsView 
               vehicle={selectedVehicle} 
@@ -274,7 +250,7 @@ export default function App() {
           )}
 
           {/* PLACEHOLDER VIEWS */}
-          {activeTab !== 'fleet' && !bookingVehicle && (
+          {['dashboard', 'tracking', 'analytics', 'settings'].includes(activeTab) && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="h-44 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-center text-slate-300 font-bold text-lg">
