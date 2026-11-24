@@ -83,3 +83,24 @@ app.post(
   requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
   AdminController.createAdminBooking,
 );
+
+app.get(
+  "/api/v1/admin/bookings",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.getAdminBookings,
+);
+
+app.post(
+  "/api/v1/admin/bookings/:id/handover",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.handoverVehicle,
+);
+
+app.post(
+  "/api/v1/admin/bookings/:id/return",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.processReturnInspection,
+);

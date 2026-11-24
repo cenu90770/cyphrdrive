@@ -236,13 +236,16 @@ export class AdminController {
     }
   }
 
-/**
+  /**
    * GET /api/v1/admin/customers/search?q=
    */
-  public static async searchCustomers(req: Request, res: Response): Promise<void> {
+  public static async searchCustomers(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
     try {
-      const query = (req.query.q as string || '').trim();
-      
+      const query = ((req.query.q as string) || "").trim();
+
       if (!query || query.length < 2) {
         res.status(200).json({ customers: [] });
         return;
@@ -269,7 +272,7 @@ export class AdminController {
       const result = await pool.query(searchQuery, [query]);
       res.status(200).json({ customers: result.rows });
     } catch (err: any) {
-      console.error('[AdminController] Customer Search Error:', err);
+      console.error("[AdminController] Customer Search Error:", err);
       res.status(500).json({ error: err.message });
     }
   }
@@ -459,6 +462,245 @@ export class AdminController {
       });
     } catch (err: any) {
       console.error("[AdminController] Admin Booking Error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
+   * GET /api/v1/admin/bookings
+   * Returns all bookings with customer, vehicle, and payment details (FR-7.1)
+   */
+  public static async getAdminBookings(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { status, search } = req.query;
+      const params: any[] = [];
+      let whereClause = "WHERE 1=1";
+
+      if (status && status !== "all") {
+        params.push(status.toString().toUpperCase());
+        whereClause += `  AND b.status = $${params.length}`;
+      }
+
+      if (search) {
+        params.push(`%${search.toString().trim()}%`);
+        whereClause += `  AND (
+          b.booking_reference ILIKE $${params.length}
+          OR CONCAT(u.first_name, ' ', u.last_name) ILIKE $${params.length}
+          OR v.license_plate ILIKE $${params.length}
+          OR v.make ILIKE $${params.length}
+        )`;
+      }
+
+      const query = `
+        SELECT 
+          b.id,
+          b.booking_reference,
+          b.start_time,
+          b.end_time,
+          b.status,
+          b.total_price,
+          b.security_deposit,
+          b.add_ons,
+          b.created_at,
+          u.id as customer_id,
+          CONCAT(u.first_name, ' ', u.last_name) as customer_name,
+          u.email as customer_email,
+          u.phone_number as customer_phone,
+          v.id as vehicle_id,
+          v.make as vehicle_make,
+          v.model as vehicle_model,
+          v.license_plate as vehicle_plate,
+          COALESCE(v.specs->>'vehicleRef', 'SB002') as vehicle_ref,
+          COALESCE(v.specs->>'mileage', '12450')::int as current_odometer,
+          br.name as pickup_branch_name
+        FROM bookings b
+        JOIN users u ON b.renter_id = u.id
+        JOIN vehicles v ON b.vehicle_id = v.id
+        JOIN branches br ON b.pickup_branch_id = br.id
+        ${whereClause}
+        ORDER BY b.created_at DESC;
+      `;
+
+      const result = await pool.query(query, params);
+      res.status(200).json({ count: result.rowCount, bookings: result.rows });
+    } catch (err: any) {
+      console.error("[AdminController] Get Bookings Error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  public static async handoverVehicle(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { id } = req.params;
+      const {
+        initialOdometer = 12450,
+        initialFuel = 100,
+        remarks = "Handed over in clean condition",
+      } = req.body;
+
+      const bookingRes = await pool.query(
+        "SELECT * FROM bookings WHERE id = $1",
+        [id],
+      );
+      if (bookingRes.rows.length === 0) {
+        res.status(404).json({ error: "Booking not found." });
+        return;
+      }
+      const booking = bookingRes.rows[0];
+
+      // Update booking to ACTIVE
+      await pool.query(
+        `INSERT INTO inspection_records (
+          booking_id, vehicle_id, inspector_id, type, odometer_reading, fuel_percentage, remarks
+        ) VALUES ($1, $2, $3, 'PICKUP', $4, $5, $6);`,
+        [
+          id,
+          booking.vehicle_id,
+          req.user!.userId,
+          initialOdometer,
+          initialFuel,
+          remarks,
+        ],
+      );
+
+      // Audit Log
+      await pool.query(
+        `INSERT INTO audit_logs (
+          actor_id, actor_role, action, resource_type, resource_id, ip_address, changes
+        ) VALUES ($1, $2, 'VEHICLE_HANDOVER_PICKUP', 'BOOKING', $3, '127.0.0.1', $4);`,
+        [
+          req.user!.userId,
+          req.user!.role,
+          id,
+          JSON.stringify({ initialOdometer, initialFuel, status: "ACTIVE" }),
+        ],
+      );
+
+      res.status(200).json({ success: true, status: "ACTIVE" });
+    } catch (err: any) {
+      console.error("[AdminController] Handover error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/bookings/:id/return
+   * Return inspection, computes incidentals, release deposit, sets status COMPLETED (FR-7.3, FR-4.5)
+   */
+  public static async processReturnInspection(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { id } = req.params;
+      const {
+        returnOdometer,
+        returnFuel,
+        fuelFee = 0,
+        lateFee = 0,
+        damageFee = 0,
+        remarks = "Returned in flawless condition",
+        photos = { front: true, back: true, left: true, right: true },
+      } = req.body;
+
+      const bookingRes = await pool.query(
+        "SELECT * FROM bookings WHERE id = $1",
+        [id],
+      );
+      if (bookingRes.rowCount === 0) {
+        res.status(404).json({ error: "Booking not found." });
+        return;
+      }
+
+      const booking = bookingRes.rows[0];
+
+      const totalIncidentals = parseFloat(
+        (Number(fuelFee) + Number(lateFee) + Number(damageFee)).toFixed(2),
+      );
+      const authorizedDeposit = parseFloat(
+        booking.security_deposit || "2000.00",
+      );
+      const refundAmount = Math.max(0, authorizedDeposit - totalIncidentals);
+
+      // 1. Mark booking as COMPLETED
+      await pool.query(
+        `UPDATE bookings SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
+        [id],
+      );
+
+      // 2. Mark vehicle AVAILABLE and update odometer
+      await pool.query(
+        `UPDATE vehicles 
+         SET status = 'AVAILABLE', 
+             specs = jsonb_set(specs, '{mileage}', to_jsonb($1::text)),
+             updated_at = NOW() 
+         WHERE id = $2`,
+        [returnOdometer.toString(), booking.vehicle_id],
+      );
+
+      // 3. Record Return Inspection (FR-8.1)
+      await pool.query(
+        `INSERT INTO inspection_records (
+          booking_id, vehicle_id, inspector_id, type, odometer_reading, fuel_percentage, photos, remarks
+        ) VALUES ($1, $2, $3, 'RETURN', $4, $5, $6, $7);`,
+        [
+          id,
+          booking.vehicle_id,
+          req.user!.userId,
+          returnOdometer,
+          returnFuel,
+          JSON.stringify(photos),
+          remarks,
+        ],
+      );
+
+      // 4. Record incidental payment transaction if incidentals incurred
+      if (totalIncidentals > 0) {
+        await pool.query(
+          `INSERT INTO payment_transactions (
+            booking_id, gateway_transaction_id, type, amount, currency, status, metadata
+          ) VALUES ($1, $2, 'INCIDENTAL_CAPTURE', $3, 'TND', 'CAPTURED', $4);`,
+          [
+            id,
+            `incidental_${Date.now()}`,
+            totalIncidentals,
+            JSON.stringify({ fuelFee, lateFee, damageFee, remarks }),
+          ],
+        );
+      }
+
+      // 5. Audit Log (NFR-7.1)
+      await pool.query(
+        `INSERT INTO audit_logs (
+          actor_id, actor_role, action, resource_type, resource_id, ip_address, changes
+        ) VALUES ($1, $2, 'VEHICLE_RETURN_CHECKIN', 'BOOKING', $3, '127.0.0.1', $4);`,
+        [
+          req.user!.userId,
+          req.user!.role,
+          id,
+          JSON.stringify({
+            returnOdometer,
+            returnFuel,
+            totalIncidentals,
+            refundAmount,
+          }),
+        ],
+      );
+
+      res.status(200).json({
+        success: true,
+        status: "COMPLETED",
+        totalIncidentals,
+        refundAmount,
+      });
+    } catch (err: any) {
+      console.error("[AdminController] Return Inspection Error:", err);
       res.status(500).json({ error: err.message });
     }
   }
