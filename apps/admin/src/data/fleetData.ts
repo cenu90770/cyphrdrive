@@ -7,6 +7,7 @@ export type VehicleStatus =
 
 export interface FleetVehicle {
   id: string;
+  displayId?: string;
   ref: string;
   brand: string;
   model: string;
