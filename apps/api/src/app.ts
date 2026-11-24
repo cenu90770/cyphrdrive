@@ -78,7 +78,7 @@ app.get(
 );
 
 app.post(
-  "/app/v1/admin/bookings",
+  "/api/v1/admin/bookings",
   authenticateToken,
   requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
   AdminController.createAdminBooking,
