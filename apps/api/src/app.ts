@@ -69,3 +69,17 @@ app.post(
   requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
   AdminController.dispatchCommand,
 );
+
+app.get(
+  "/api/v1/admin/customers/search",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.searchCustomers,
+);
+
+app.post(
+  "/app/v1/admin/bookings",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.createAdminBooking,
+);
