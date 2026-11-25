@@ -9,7 +9,9 @@
     "typecheck": "turbo typecheck",
     "db:up": "docker compose -f deploy/docker-compose.yml up -d",
     "db:down": "docker compose -f deploy/docker-compose.yml down",
-    "clean": "turbo clean && rm -rf node_modules **/*/node_modules"
+    "clean": "turbo clean && rm -rf node_modules **/*/node_modules",
+    "telemetry:clean": "pnpm --filter @cyphrdrive/api exec ts-node src/scripts/clean-telemetry.ts",
+    "telemetry:stream": "pnpm --filter @cyphrdrive/api exec ts-node src/scripts/stream-tunis-telematics.ts"
   },
   "devDependencies": {
     "turbo": "^2.0.0",
