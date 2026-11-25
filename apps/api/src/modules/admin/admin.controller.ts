@@ -725,7 +725,7 @@ export class AdminController {
           battery_level,
           fuel_level,
           doors_locked,
-          engine_running,
+          engine_running
         FROM telemetry_logs
         WHERE vehicle_id = $1
         ORDER BY recorded_at ASC
