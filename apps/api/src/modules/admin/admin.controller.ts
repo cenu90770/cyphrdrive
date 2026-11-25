@@ -704,4 +704,50 @@ export class AdminController {
       res.status(500).json({ error: err.message });
     }
   }
+
+  /**
+   * GET /api/v1/admin/fleet/:vehicleId/trajectory
+   * Returns historical GPS breadcrumbs from TimescaleDB hypertable (FR-11.1)
+   */
+  public static async getVehicleTrajectory(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { vehicleId } = req.params;
+
+      const query = `
+        SELECT
+          recorded_at,
+          ROUND(ST_Y(location::geometry)::numeric, 5) AS latitude,
+          ROUND(ST_X(location::geometry)::numeric, 5) AS longitude,
+          speed_kmh,
+          battery_level,
+          fuel_level,
+          doors_locked,
+          engine_running,
+        FROM telemetry_logs
+        WHERE vehicle_id = $1
+        ORDER BY recorded_at ASC
+        LIMIT 100;
+      `;
+
+      const result = await pool.query(query, [vehicleId]);
+
+      const coordinates: [number, number][] = result.rows.map((r) => [
+        parseFloat(r.latitude),
+        parseFloat(r.longitude),
+      ]);
+
+      res.status(200).json({
+        vehicleId,
+        count: result.rowCount,
+        coordinates,
+        history: coordinates,
+      });
+    } catch (err: any) {
+      console.error("[AdminController] Trajectory Error: ", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
 }

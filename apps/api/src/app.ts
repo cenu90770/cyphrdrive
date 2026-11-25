@@ -104,3 +104,10 @@ app.post(
   requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
   AdminController.processReturnInspection,
 );
+
+app.get(
+  "/api/v1/admin/fleet/:vehicleId/trajectory",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.getVehicleTrajectory,
+);
