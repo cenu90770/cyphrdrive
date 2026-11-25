@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Filter, LayoutGrid, List, RefreshCw } from 'lucide-react';
 import { AdminSidebar, NavTab } from './components/AdminSidebar';
 import { AdminHeader } from './components/AdminHeader';
+import { DashboardOverview } from './components/DashboardOverview';
 import { FleetTable } from './components/FleetTable';
 import { FleetGrid } from './components/FleetGrid';
 import { VehicleDetailsView } from './components/VehicleDetailsView';
@@ -13,7 +14,7 @@ import { FleetVehicle } from './data/fleetData';
 import { apiRequest } from './lib/api';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('tracking'); // Default to tracking to view the new map immediately
+  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
   const [selectedVehicle, setSelectedVehicle] = useState<FleetVehicle | null>(null);
   const [bookingVehicle, setBookingVehicle] = useState<FleetVehicle | null>(null);
@@ -141,10 +142,28 @@ export default function App() {
               {errorMessage}
             </div>
           )}
-
-          {/* VIEW 1: REAL-TIME CAR TRACKING */}
-          {activeTab === 'tracking' && adminToken && (
-            <CarTrackingMap adminToken={adminToken} />
+          
+          {/* VIEW 1: DASHBOARD OVERVIEW */}
+          {activeTab === 'dashboard' && adminToken && (
+            <DashboardOverview
+              adminToken={adminToken}
+              onNavigateToFleet={() => {
+                setActiveTab('fleet');
+                setSelectedVehicle(null);
+                setIsOnboarding(false);
+              }}
+              onNavigateToBookings={() => {
+                setActiveTab('booking');
+                setBookingVehicle(null);
+              }}
+              onNavigateToTracking={() => {
+                setActiveTab('tracking');
+              }}
+              onNewBookingClick={() => {
+                const car = vehicles.find((v) => v.status === 'available') || vehicles[0];
+                setBookingVehicle(car);
+              }}
+            />
           )}
 
           {/* VIEW 2: FLEET OVERVIEW */}
@@ -258,8 +277,13 @@ export default function App() {
             />
           )}
 
+          {/* VIEW 7: REAL-TIME CAR TRACKING */}
+          {activeTab === 'tracking' && adminToken && (
+            <CarTrackingMap adminToken={adminToken} />
+          )}
+
           {/* PLACEHOLDER VIEWS */}
-          {['dashboard', 'analytics', 'settings'].includes(activeTab) && (
+          {['analytics', 'settings'].includes(activeTab) && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="h-44 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-center text-slate-300 font-bold text-lg">
