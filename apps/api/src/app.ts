@@ -111,3 +111,10 @@ app.get(
   requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
   AdminController.getVehicleTrajectory,
 );
+
+app.get(
+  "/api/v1/admin/dashboard/kpis",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.getDashboardKpis,
+);

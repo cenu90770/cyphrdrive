@@ -750,4 +750,121 @@ export class AdminController {
       res.status(500).json({ error: err.message });
     }
   }
+
+  /**
+   * GET /api/v1/admin/dashboard/kpis
+   * Computes real-time branch KPIs, utilization, and today's schedule (FR-10.1)
+   * @param req
+   * @param res
+   */
+  public static async getDashboardKpis(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      let branchFilter = "";
+      const params: any[] = [];
+
+      if (req.user!.role === "FLEET_ADMIN") {
+        params.push(req.user!.branchIds);
+        branchFilter = `WHERE branch_id = ANY($1::uuid[])`;
+      }
+
+      // 1. Vehicle counts by status
+      const vehicleRes = await pool.query(
+        `SELECT status, COUNT(*)::int as count
+          FROM vehicles
+          ${branchFilter}
+          GROUP BY status;`,
+        params,
+      );
+
+      const statusMap: Record<string, number> = {
+        AVAILABLE: 0,
+        BOOKED: 0,
+        UNDER_MAINTENANCE: 0,
+        OUT_OF_SERVICE: 0,
+        PICKED_UP: 0,
+      };
+
+      let totalVehicles = 0;
+      vehicleRes.rows.forEach((r) => {
+        statusMap[r.status] = r.count;
+        totalVehicles += r.count;
+      });
+
+      // 2. Active rentals count
+      const activeRentalsRes = await pool.query(
+        `SELECT COUNT(*)::int as count FROM bookings WHERE status = 'ACTIVE';`,
+      );
+      const activeRentals = activeRentalsRes.rows[0].count;
+      statusMap["PICKED_UP"] = activeRentals;
+
+      // Utilization %: Non-available vehicles / Fleet size
+      const availableVehicles = statusMap["AVAILABLE"] || 0;
+      const utilizationRate =
+        totalVehicles > 0
+          ? Math.round(
+              ((totalVehicles - availableVehicles) / totalVehicles) * 100,
+            )
+          : 0;
+
+      // 3. Monthly Revenue (TND)
+      const revenueRes = await pool.query(
+        `SELECT COALESCE(SUM(total_price), 0)::numeric as total
+          FROM bookings
+          WHERE status IN ('CONFIRMED', 'ACTIVE', 'COMPLETED')
+            AND created_at >= DATE_TRUNC('month', CURRENT_DATE);`,
+      );
+
+      const monthlyRevenue = parseFloat(revenueRes.rows[0].total).toFixed(2);
+
+      // 4. Today's Rending Pickups & Returns
+      const todayPickupsRes = await pool.query(
+        `SELECT COUNT(*)::int as count FROM bookings
+          WHERE status = 'CONFIRMED' AND start_time::date = CURRENT_DATE;`,
+      );
+
+      const todayReturnsRes = await pool.query(
+        `SELECT COUNT(*)::int as count FROM bookings
+          WHERE status = 'ACTIVE' AND end_time::date = CURRENT_DATE;`,
+      );
+
+      // 5. Recent 5 Bookings Feed
+      const recentBookingsRes = await pool.query(
+        `SELECT
+          b.id, b.booking_reference, b.status, b.total_price, b.created_at,
+          CONCAT(u.first_name, ' ', u.last_name) as customer_name,
+          v.make as vehicle_make, v.model as vehicle_model, v.license_plate
+        FROM bookings b
+        JOIN users u ON b.renter_id = u.id
+        JOIN vehicles v ON b.vehicle_id = v.id
+        ORDER BY b.created_at DESC
+        LIMIT 5;`,
+      );
+
+      res.status(200).json({
+        totalVehicles,
+        availableVehicles,
+        activeRentals,
+        utilizationRate,
+        monthlyRevenue: `${monthlyRevenue} TND`,
+        todayPickups: todayPickupsRes.rows[0].count,
+        todayReturns: todayReturnsRes.rows[0].count,
+        statusBreakdown: {
+          available: availableVehicles,
+          pickedUp: activeRentals,
+          booked: statusMap["BOOKED"] || 0,
+          service: statusMap["UNDER_MAINTENANCE"] || 0,
+          issue: statusMap["OUT_OF_SERVICE"] || 0,
+        },
+        recentBookings: recentBookingsRes.rows,
+      });
+
+
+    } catch (err: any) {
+      console.error('[AdminController] Dashboard KPIs Error: ', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
 }
