@@ -118,3 +118,10 @@ app.get(
   requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
   AdminController.getDashboardKpis,
 );
+
+app.get(
+  "/api/v1/admin/analytics/reports",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.getAnalyticsReports,
+);
