@@ -11,7 +11,8 @@
     "db:down": "docker compose -f deploy/docker-compose.yml down",
     "clean": "turbo clean && rm -rf node_modules **/*/node_modules",
     "telemetry:clean": "pnpm --filter @cyphrdrive/api exec ts-node src/scripts/clean-telemetry.ts",
-    "telemetry:stream": "pnpm --filter @cyphrdrive/api exec ts-node src/scripts/stream-tunis-telematics.ts"
+    "telemetry:stream": "pnpm --filter @cyphrdrive/api exec ts-node src/scripts/stream-tunis-telematics.ts",
+    "fleet:import": "pnpm --filter @cyphrdrive/api exec ts-node src/scripts/import-fleet-csv.ts"
   },
   "devDependencies": {
     "turbo": "^2.0.0",
