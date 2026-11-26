@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Filter, LayoutGrid, List, RefreshCw } from 'lucide-react';
 import { AdminSidebar, NavTab } from './components/AdminSidebar';
 import { AdminHeader } from './components/AdminHeader';
-import { DashboardOverview } from './components/DashboardOverview';
 import { FleetTable } from './components/FleetTable';
 import { FleetGrid } from './components/FleetGrid';
 import { VehicleDetailsView } from './components/VehicleDetailsView';
@@ -10,6 +9,8 @@ import { VehicleOnboardingWizard } from './components/VehicleOnboardingWizard';
 import { AdminBookingWizard } from './components/AdminBookingWizard';
 import { BookingManagement } from './components/BookingManagement';
 import { CarTrackingMap } from './components/CarTrackingMap';
+import { DashboardOverview } from './components/DashboardOverview';
+import { AnalyticsReports } from './components/AnalyticsReports';
 import { FleetVehicle } from './data/fleetData';
 import { apiRequest } from './lib/api';
 
@@ -107,6 +108,7 @@ export default function App() {
   });
 
   const getBreadcrumbs = () => {
+    if (activeTab === 'analytics') return ['Analytics', 'Overview'];
     if (activeTab === 'tracking') return ['Car Tracking'];
     if (bookingVehicle) return ['Booking', 'New Booking'];
     if (activeTab === 'booking') return ['Booking', 'Overview'];
@@ -132,7 +134,7 @@ export default function App() {
         }} 
       />
 
-      {/* 2. Main Content Workspace */}
+      {/* 2. Main Workspace Layout */}
       <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader breadcrumbs={getBreadcrumbs()} />
 
@@ -142,7 +144,7 @@ export default function App() {
               {errorMessage}
             </div>
           )}
-          
+
           {/* VIEW 1: DASHBOARD OVERVIEW */}
           {activeTab === 'dashboard' && adminToken && (
             <DashboardOverview
@@ -166,7 +168,17 @@ export default function App() {
             />
           )}
 
-          {/* VIEW 2: FLEET OVERVIEW */}
+          {/* VIEW 2: ANALYTICS & REPORTS (FR-10.1) */}
+          {activeTab === 'analytics' && adminToken && (
+            <AnalyticsReports adminToken={adminToken} />
+          )}
+
+          {/* VIEW 3: CAR TRACKING (LEAFLET LIVE MAP) */}
+          {activeTab === 'tracking' && adminToken && (
+            <CarTrackingMap adminToken={adminToken} />
+          )}
+
+          {/* VIEW 4: FLEET OVERVIEW */}
           {activeTab === 'fleet' && !selectedVehicle && !isOnboarding && !bookingVehicle && (
             <div className="space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -232,7 +244,7 @@ export default function App() {
             </div>
           )}
 
-          {/* VIEW 3: BOOKINGS LIST & RETURN MANAGEMENT */}
+          {/* VIEW 5: BOOKINGS LIST & RETURN MANAGEMENT */}
           {activeTab === 'booking' && !bookingVehicle && adminToken && (
             <BookingManagement
               adminToken={adminToken}
@@ -243,7 +255,7 @@ export default function App() {
             />
           )}
 
-          {/* VIEW 4: 4-STEP BOOKING WIZARD */}
+          {/* VIEW 6: 4-STEP BOOKING WIZARD */}
           {bookingVehicle && adminToken && (
             <AdminBookingWizard
               vehicle={bookingVehicle}
@@ -257,7 +269,7 @@ export default function App() {
             />
           )}
 
-          {/* VIEW 5: ONBOARDING WIZARD */}
+          {/* VIEW 7: ONBOARDING WIZARD */}
           {activeTab === 'fleet' && isOnboarding && adminToken && (
             <VehicleOnboardingWizard
               adminToken={adminToken}
@@ -269,7 +281,7 @@ export default function App() {
             />
           )}
 
-          {/* VIEW 6: VEHICLE DETAILS */}
+          {/* VIEW 8: VEHICLE DETAILS */}
           {activeTab === 'fleet' && selectedVehicle && !isOnboarding && !bookingVehicle && (
             <VehicleDetailsView 
               vehicle={selectedVehicle} 
@@ -277,19 +289,10 @@ export default function App() {
             />
           )}
 
-          {/* VIEW 7: REAL-TIME CAR TRACKING */}
-          {activeTab === 'tracking' && adminToken && (
-            <CarTrackingMap adminToken={adminToken} />
-          )}
-
-          {/* PLACEHOLDER VIEWS */}
-          {['analytics', 'settings'].includes(activeTab) && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-44 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-center text-slate-300 font-bold text-lg">
-                  {activeTab.toUpperCase()} WIDGET {i}
-                </div>
-              ))}
+          {/* VIEW 9: SETTINGS PLACEHOLDER */}
+          {activeTab === 'settings' && (
+            <div className="h-64 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-center text-slate-400 font-bold">
+              Settings & Branch Configuration
             </div>
           )}
         </main>
