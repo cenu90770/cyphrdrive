@@ -11,6 +11,7 @@ import { BookingManagement } from './components/BookingManagement';
 import { CarTrackingMap } from './components/CarTrackingMap';
 import { DashboardOverview } from './components/DashboardOverview';
 import { AnalyticsReports } from './components/AnalyticsReports';
+import { BranchSettingsView } from './components/BranchSettingsView';
 import { FleetVehicle } from './data/fleetData';
 import { apiRequest } from './lib/api';
 
@@ -108,6 +109,7 @@ export default function App() {
   });
 
   const getBreadcrumbs = () => {
+    if (activeTab === 'settings') return ['Settings', 'Branch Configuration'];
     if (activeTab === 'analytics') return ['Analytics', 'Overview'];
     if (activeTab === 'tracking') return ['Car Tracking'];
     if (bookingVehicle) return ['Booking', 'New Booking'];
@@ -118,7 +120,7 @@ export default function App() {
       if (selectedVehicle) return ['Fleet', 'Vehicle Details'];
       return ['Fleet', 'Overview'];
     }
-    return [activeTab.charAt(0).toUpperCase() + activeTab.slice(1)];
+    return [String(activeTab).charAt(0).toUpperCase() + String(activeTab).slice(1)];
   };
 
   return (
@@ -289,12 +291,11 @@ export default function App() {
             />
           )}
 
-          {/* VIEW 9: SETTINGS PLACEHOLDER */}
-          {activeTab === 'settings' && (
-            <div className="h-64 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-center text-slate-400 font-bold">
-              Settings & Branch Configuration
-            </div>
+          {/* VIEW 9: SETTINGS & BRANCH CONFIGURATION */}
+          {activeTab === 'settings' && adminToken && (
+            <BranchSettingsView adminToken={adminToken} />
           )}
+
         </main>
       </div>
     </div>
