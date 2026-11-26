@@ -978,4 +978,130 @@ export class AdminController {
       res.status(500).json({ error: err.message });
     }
   }
+
+  /**
+   * GET /api/v1/admin/settings/branch
+   * Fetches branch profile, operatings hours, and surge rules (FR-6.4, FR-6.8)
+   */
+  public static async getBranchSettings(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const branchId = req.user!.branchIds && req.user!.branchIds[0];
+
+      // Query primary branch or fallback to first branch
+      const branchRes = await pool.query(
+        `
+        SELECT id, name, code, address, city, country, contact_phone, contact_email, operating_hours
+        FROM branches
+        WHERE id = COALESCE($1::uuid, id)
+        LIMIT 1;`,
+        [branchId || null],
+      );
+
+      if (branchRes.rowCount === 0) {
+        res.status(404).json({ error: "Branch not found." });
+        return;
+      }
+
+      const branch = branchRes.rows[0];
+
+      res.status(200).json({
+        id: branch.id,
+        name: branch.name,
+        code: branch.code,
+        address: branch.address,
+        city: branch.city,
+        country: branch.country,
+        phone: branch.contact_phone,
+        email: branch.contact_email,
+        operatingHours: branch.operating_hours || {
+          mon_fri: "8:00 - 20:00",
+          sat_sun: "09:00 - 18:00",
+        },
+        surgeRules: {
+          autoSurgeEnabled: true,
+          thresholdUtilization: 80,
+          surgeMultiplier: 1.25,
+          peakSeasonStart: "01.06,",
+          peakSeasonEnd: "31.08",
+          seasonalMultiplier: 1.3,
+        },
+        security: {
+          mfaEnabled: true,
+          emailAlerts: true,
+          smsAlerts: false,
+        },
+      });
+    } catch (err: any) {
+      console.error("[AdminController] Get Branch Settings Error: ", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
+   * PUT /api/v1/admin/settings/branch
+   * Saves updated branch details and automated surge pricing rules (FR-6.4, FR-6.8, NFR-7.1)
+   */
+  public static async updateBranchSettings(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { id, name, address, phone, email, operatingHours, surgeRules } =
+        req.body;
+
+      if (!id || !name || !email) {
+        res
+          .status(400)
+          .json({ error: "Branch ID, name, and email are required." });
+        return;
+      }
+
+      // Store operating hours and surge rules together in jsonb
+      const combinedSettings = {
+        ...operatingHours,
+        surgeRules,
+      };
+
+      const updateQuery = `
+        UPDATE branches
+        SET name = $1,
+            address = $2,
+            contact_phone = $3,
+            contact_email = $4,
+            operating_hours = $5::jsonb,
+            updated_at = NOW()
+        WHERE id = $6
+        RETURNING *;
+      `;
+
+      const updateResult = await pool.query(updateQuery, [
+        name,
+        address,
+        phone,
+        email,
+        JSON.stringify(combinedSettings),
+        id,
+      ]);
+
+      // Audit Log Entry (NFR-7.1)
+      (await pool.query(`
+        INSERT INTO audit_logs (
+          actor_id, actor_role, action, resource_type, resource_id, ip_address, changes
+        ) VALUES ($1, $2, 'BRANCH_SETTINGS_UPDATED', 'BRANCH', $3, '127.0.0.1', $4);`),
+        [
+          req.user!.userId,
+          req.user!.role,
+          id,
+          JSON.stringify({ name, email, surgeRules }),
+        ]);
+
+      res.status(200).json({ success: true, branch: updateResult.rows[0] });
+    } catch (err: any) {
+      console.error("[AdminController] Update Settings Error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
 }

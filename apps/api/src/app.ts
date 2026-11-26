@@ -7,6 +7,7 @@ import { VehicleController } from "./modules/vehicle/vehicle.controller";
 import { BookingController } from "./modules/booking/booking.controller";
 import { authenticateToken, requireRole } from "./middlewares/auth.middleware";
 import { AdminController } from "./modules/admin/admin.controller";
+import { get } from "http";
 
 export const app = express();
 
@@ -124,4 +125,18 @@ app.get(
   authenticateToken,
   requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
   AdminController.getAnalyticsReports,
+);
+
+app.get(
+  "/api/v1/admin/settings/branch",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.getBranchSettings,
+);
+
+app.put(
+  "/api/v1/admin/settings/branch",
+  authenticateToken,
+  requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
+  AdminController.updateBranchSettings,
 );
