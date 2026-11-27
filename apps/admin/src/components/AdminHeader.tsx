@@ -17,7 +17,7 @@ export const AdminHeader: React.FC<HeaderProps> = ({
   onNavigateToTracking,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
-  const [unreadCount, setUnreadCount] = useState<number>(4); // Default 4 matching wireframe Page 19
+  const [unreadCount, setUnreadCount] = useState<number>(4);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -30,16 +30,21 @@ export const AdminHeader: React.FC<HeaderProps> = ({
         {},
         adminToken
       );
-      setUnreadCount(data.unreadCount);
-      setNotifications(data.notifications);
-    } catch (e) {
-      // Graceful fallback to initial values
+
+      if (data && Array.isArray(data.notifications)) {
+        setNotifications(data.notifications);
+        // Compute unread count either from backend property or directly from array items
+        const computedCount = data.notifications.filter((n) => !n.read).length;
+        setUnreadCount(typeof data.unreadCount === 'number' ? data.unreadCount : computedCount);
+      }
+    } catch (err: any) {
+      console.warn('[AdminHeader] Notifications warning:', err.message);
     }
   };
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 5000); // Poll every 5s for real-time events
+    const interval = setInterval(fetchNotifications, 5000);
     return () => clearInterval(interval);
   }, [adminToken]);
 
@@ -54,23 +59,26 @@ export const AdminHeader: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Mark single as read
+  // Mark single notification as read
   const handleMarkAsRead = async (id: string) => {
     try {
       await apiRequest(`/admin/notifications/${id}/read`, { method: 'PUT' }, adminToken || undefined);
-      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-      setUnreadCount((c) => Math.max(0, c - 1));
     } catch (e) {}
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setUnreadCount((c) => Math.max(0, c - 1));
   };
 
-  // Mark all as read
+  // Mark all notifications as read
   const handleMarkAllAsRead = async () => {
     try {
       await apiRequest('/admin/notifications/mark-all-read', { method: 'PUT' }, adminToken || undefined);
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-      setUnreadCount(0);
     } catch (e) {}
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
   };
+
+  // Display badge count: uses unreadCount or dynamically calculates from unread notifications
+  const effectiveUnread = unreadCount > 0 ? unreadCount : notifications.filter((n) => !n.read).length;
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30 ml-16">
@@ -88,26 +96,32 @@ export const AdminHeader: React.FC<HeaderProps> = ({
 
       {/* Right Controls */}
       <div className="flex items-center space-x-3 relative" ref={dropdownRef}>
-        {/* Notification Bell Button */}
-        <div className="relative">
+        {/* Relative Wrapper for Bell and Red Badge (Guarantees NO button clipping) */}
+        <div className="relative inline-flex items-center justify-center">
           <button
+            type="button"
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition relative"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition"
             title="Notifications"
           >
-            <Bell className="w-5 h-5" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                {unreadCount}
-              </span>
-            )}
+            <Bell className="w-5 h-5 text-slate-700" />
           </button>
+
+          {/* Red Counter Badge - Positioned on the wrapper, NOT inside the <button> */}
+          {effectiveUnread > 0 && (
+            <span
+              style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+              className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-md z-30 pointer-events-none"
+            >
+              {effectiveUnread}
+            </span>
+          )}
 
           {/* Interactive Notifications Drawer */}
           {dropdownOpen && (
             <NotificationsDropdown
               notifications={notifications}
-              unreadCount={unreadCount}
+              unreadCount={effectiveUnread}
               onMarkAsRead={handleMarkAsRead}
               onMarkAllAsRead={handleMarkAllAsRead}
               onClose={() => setDropdownOpen(false)}
@@ -123,12 +137,12 @@ export const AdminHeader: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* User Profile */}
+        {/* User Profile Button */}
         <button 
           className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition"
           title="Fleet Administrator"
         >
-          <User className="w-5 h-5" />
+          <User className="w-5 h-5 text-slate-700" />
         </button>
       </div>
     </header>
