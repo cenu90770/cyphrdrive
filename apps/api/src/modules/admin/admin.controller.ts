@@ -1113,4 +1113,77 @@ export class AdminController {
       res.status(500).json({ error: err.message });
     }
   }
+
+  /**
+   * GET /api/v1/admin/notifications
+   * Returns unread count and latest 20 notifications (FR-7.4, FR-11.1)
+   */
+  public static async getNotifications(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const listQuery = `
+        SELECT id, title, message, type, severity, read, resource_id, created_at
+        FROM notifications
+        ORDER BY created_at DESC
+        LIMIT 20;
+      `;
+      const result = await pool.query(listQuery);
+
+      const unreadCountRes = await pool.query(
+        `SELECT COUNT(*)::int as unread FROM notifications WHERE read = FALSE;`,
+      );
+
+      res.status(200).json({
+        unreadCout: unreadCountRes.rows[0].unread,
+        notifications: result.rows,
+      });
+    } catch (err: any) {
+      console.error("[AdminController] Get Notifications Error: ", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
+   * PUT /api/v1/admin/notifications/:id/read
+   * Marks a single notification as read
+   */
+  public static async markNotificationRead(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { id } = req.params;
+      await pool.query("UPDATE notifications SET read = TRUE WHERE id = $1", [
+        id,
+      ]);
+      res.status(200).json({ success: true, id });
+    } catch (err: any) {
+      console.error("[AdminController] Mark Notification as Read Error: ", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  /**
+   * PUT /api/v1/admin/notifications/mark-all-read
+   * Marks all notifications as read  (clears badge counter)
+   */
+  public static async markAllNotificationsRead(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      await pool.query(
+        "UPDATE notifications SET read = TRUE WHERE read = FALSE;",
+      );
+      res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error(
+        "[AdminController] Mark all Notifications as Read Error: ",
+        err,
+      );
+      res.status(500).json({ error: err.message });
+    }
+  }
 }
