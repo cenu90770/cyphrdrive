@@ -465,6 +465,17 @@ export class AdminController {
         }),
       ]);
 
+      // 8. Automatically generate a real-time notification (FR-7.4)
+      await pool.query(
+        `INSERT INTO notifications (title, message, type, severity, read, resource_id)
+         VALUES ($1, $2, 'BOOKING', 'SUCCESS', FALSE, $3);`,
+        [
+          `New Booking #${bookingReference}`,
+          `Reservation placed for vehicle ${vehicleRes.rows[0].make} ${vehicleRes.rows[0].model} by ${firstName} ${lastName}.`,
+          bookingReference,
+        ],
+      );
+
       res.status(201).json({
         bookingId: bookingReference,
         booking: bookingInsert.rows[0],
