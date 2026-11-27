@@ -185,3 +185,22 @@ CREATE TABLE telemetry_logs (
 SELECT create_hypertable('telemetry_logs', 'recorded_at', chunk_time_interval => INTERVAL '7 days');
 
 CREATE INDEX idx_telemetry_vehicle_time ON telemetry_logs (vehicle_id, recorded_at DESC);
+
+-- ============================================================================
+-- 12. Real-Time System Notifications (FR-7.4, FR-11.1)
+-- ============================================================================
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(150) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL, -- 'BOOKING', 'TELEMATICS', 'MAINTENANCE', 'OPERATIONS', 'SYSTEM'
+    severity VARCHAR(20) NOT NULL DEFAULT 'INFO', -- 'INFO', 'WARNING', 'CRITICAL', 'SUCCESS'
+    read BOOLEAN NOT NULL DEFAULT FALSE,
+    resource_id VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_read ON notifications(read);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);

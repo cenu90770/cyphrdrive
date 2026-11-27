@@ -149,3 +149,45 @@ VALUES
     12450,
     '{}'
 );
+
+-- ============================================================================
+-- 6. Seed Initial Notifications (4 Unread Notifications)
+-- ============================================================================
+INSERT INTO notifications (title, message, type, severity, read, resource_id, created_at)
+VALUES
+(
+    'New Booking #934566',
+    'Reservation placed for Suzuki Baleno by Mohammed Ben Romdhane.',
+    'BOOKING',
+    'SUCCESS',
+    FALSE,
+    '934566',
+    NOW() - INTERVAL '5 minutes'
+),
+(
+    '🚨 Critical OBD-II Engine Alert',
+    'Engine Coolant Temperature Circuit Low (P0117) detected on MG ZS (MZ008).',
+    'TELEMATICS',
+    'CRITICAL',
+    FALSE,
+    'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01',
+    NOW() - INTERVAL '25 minutes'
+),
+(
+    'Vehicle Return Due Today',
+    'Return inspection scheduled for Audi Q5 Sportback (224 TUN 8891) at 10:00 am.',
+    'OPERATIONS',
+    'WARNING',
+    FALSE,
+    'AQ202',
+    NOW() - INTERVAL '2 hours'
+),
+(
+    'Vehicle Added to Pool',
+    'Kia Picanto (KP002) was successfully onboarded by fleet administrator.',
+    'SYSTEM',
+    'INFO',
+    FALSE,
+    'KP002',
+    NOW() - INTERVAL '4 hours'
+);
