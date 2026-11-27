@@ -12,8 +12,8 @@ import { CarTrackingMap } from './components/CarTrackingMap';
 import { DashboardOverview } from './components/DashboardOverview';
 import { AnalyticsReports } from './components/AnalyticsReports';
 import { BranchSettingsView } from './components/BranchSettingsView';
-import { FleetVehicle } from './data/fleetData';
 import { apiRequest } from './lib/api';
+import { FleetVehicle, VehicleStatus } from '@cyphrdrive/contracts';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
@@ -67,20 +67,21 @@ export default function App() {
         {},
         adminToken
       );
-
+      
       const mappedVehicles: FleetVehicle[] = data.vehicles.map((v, index) => ({
         id: v.id,
-        displayId: v.id.replace(/-/g, '').slice(-6).toUpperCase(),
-        ref: v.specs?.vehicleRef || `SB${String(index + 2).padStart(3, '0')}`,
+        displayId: v.specs?.displayId || v.id.replace(/-/g, '').slice(-6).toUpperCase(),
+        ref: v.specs?.vehicleRef || `CD-${String(index + 1).padStart(3, '0')}`,
         brand: v.brand,
         model: v.model,
         transmission: v.transmission,
         fuel: v.fuel,
         power: v.power,
-        firstReg: v.firstReg,
-        mileage: v.mileage,
-        nextMaint: v.nextMaint,
-        status: v.status,
+        firstReg: v.specs?.firstReg || v.firstReg,
+        mileage: v.specs?.mileage || v.mileage,
+        nextMaint: v.specs?.nextMaint || v.specs?.nextMaintenance || '01.12.2027',
+        // Preserve exact CSV status: picked-up, booked, available, service, issue
+        status: (v.specs?.csvStatus || v.status) as any,
         ratePerDay: v.ratePerDay,
         image: v.image || undefined,
         licensePlate: v.license_plate,

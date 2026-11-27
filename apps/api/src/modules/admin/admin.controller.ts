@@ -1,13 +1,14 @@
 import { Request, Response } from "express";
 import { TelematicsService } from "../telematics/telematics.service";
 import { pool } from "../../config/db";
+import { FleetVehicle } from "@cyphrdrive/contracts";
 
 export class AdminController {
   /**
    * GET /api/v1/admin/fleet/vehicles
    * Returns all vehicles for the admin's assigned branches with specs and metrics
    */
-  public static async getFleetVehilces(
+  public static async getFleetVehicles(
     req: Request,
     res: Response,
   ): Promise<void> {
@@ -15,7 +16,6 @@ export class AdminController {
       let branchFilterQuery = "";
       const params: any[] = [];
 
-      // Fleet Admins can only view vehicles in their assigned branches
       if (req.user!.role === "FLEET_ADMIN") {
         const allowedBranches = req.user!.branchIds;
         params.push(allowedBranches);
@@ -23,49 +23,58 @@ export class AdminController {
       }
 
       const query = `
-        SELECT
+        SELECT 
           v.id,
+          -- Native PostgreSQL string functions (REPLACE and LEFT)
+          COALESCE(v.specs->>'displayId', UPPER(LEFT(REPLACE(v.id::text, '-', ''), 6))) AS "displayId",
+          COALESCE(v.specs->>'vehicleRef', LEFT(v.vin, 6)) AS ref,
           v.vin,
           v.license_plate,
-          v.make as brand,
+          v.make AS brand,
           v.model,
           v.year,
           v.category,
-          CASE
+          COALESCE(v.specs->>'baySlot', '001') AS "baySlot",
+          CASE 
             WHEN v.transmission = 'MANUAL' THEN 'Manual gearbox'
             ELSE 'Automatic'
-          END as transmission,
-          CASE
+          END AS transmission,
+          CASE 
             WHEN v.fuel_type = 'GASOLINE' THEN 'Petrol'
             WHEN v.fuel_type = 'DIESEL' THEN 'Diesel'
             WHEN v.fuel_type = 'ELECTRIC' THEN 'Electric'
             ELSE 'Hybrid'
-          END as fuel,
-          COALESCE(v.specs->>'power', '66 kW (90 hp)') as power,
-          TO_CHAR(v.created_at, 'MM.YYYY') as "firstReg",
-          CONCAT(COALESCE(v.specs->>'mileage', '12.450'), ' km') as mileage,
-          COALESCE(v.specs->>'nextMaintenance', '01.12.2027') as "nextMaint",
-          CASE
-            WHEN v.status = 'AVAILABLE' THEN 'available'
-            WHEN v.status = 'BOOKED' THEN 'booked'
-            WHEN v.status = 'UNDER_MAINTENANCE' THEN 'service'
-            WHEN v.status = 'OUT_OF_SERVICE' THEN 'issue'
-            ELSE 'picked-up'
-          END as status,
-          CONCAT(v.base_daily_rate::text, ' TND') as "ratePerDay",
-          v.photos[1] as image,
+          END AS fuel,
+          COALESCE(v.specs->>'power', '66 kW (90 hp)') AS power,
+          COALESCE(v.specs->>'firstReg', TO_CHAR(v.created_at, 'MM.YYYY')) AS "firstReg",
+          COALESCE(v.specs->>'mileage', '12.450 km') AS mileage,
+          COALESCE(v.specs->>'nextMaintenance', '01.12.2027') AS "nextMaint",
+          -- Prioritize exact CSV status (picked-up, booked, service, issue, available)
+          COALESCE(
+            v.specs->>'csvStatus',
+            CASE 
+              WHEN v.status = 'AVAILABLE' THEN 'available'
+              WHEN v.status = 'BOOKED' THEN 'booked'
+              WHEN v.status = 'UNDER_MAINTENANCE' THEN 'service'
+              WHEN v.status = 'OUT_OF_SERVICE' THEN 'issue'
+              ELSE 'picked-up'
+            END
+          ) AS status,
+          CONCAT(v.base_daily_rate::text, ' TND') AS "ratePerDay",
+          v.photos[1] AS image,
           v.specs,
-          b.name as branch_name,
-          b.id as branch_id
+          b.name AS branch_name,
+          b.id AS branch_id
         FROM vehicles v
         JOIN branches b ON v.branch_id = b.id
         ${branchFilterQuery}
-        ORDER BY v.created_at DESC;
+        ORDER BY COALESCE(v.specs->>'baySlot', '999') ASC, v.created_at DESC;
       `;
 
       const result = await pool.query(query, params);
       res.status(200).json({ count: result.rowCount, vehicles: result.rows });
     } catch (err: any) {
+      console.error("[AdminController] Get Vehicles Error:", err);
       res.status(500).json({ error: err.message });
     }
   }

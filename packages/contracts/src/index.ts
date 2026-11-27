@@ -14,7 +14,38 @@ export interface AuthenticatedUserClaims {
 }
 
 // ============================================================================
-// 2. BOOKING & PRICING CONTRACTS (FR-3)
+// 2. CAR FLEET CONTRACTS
+// ============================================================================
+export type VehicleStatus =
+  | "available"
+  | "picked-up"
+  | "booked"
+  | "service"
+  | "issue";
+
+export interface FleetVehicle {
+  id: string;
+  displayId?: string;
+  ref: string;
+  brand: string;
+  model: string;
+  transmission: "Manual gearbox" | "Automatic";
+  fuel: "Petrol" | "Diesel";
+  power: string;
+  firstReg: string;
+  mileage: string;
+  nextMaint: string;
+  status: VehicleStatus;
+  ratePerDay: string;
+  image?: string;
+  licensePlate?: string;
+  specs?: any;
+  leasing?: any;
+  insurance?: any;
+}
+
+// ============================================================================
+// 3. BOOKING & PRICING CONTRACTS (FR-3)
 // ============================================================================
 export const AddOnTypeEnum = z.enum([
   "GPS_NAVIGATION",
@@ -52,7 +83,7 @@ export interface BookingRecord {
 }
 
 // ============================================================================
-// 3. TELEMATICS & IOT CONTRACTS (FR-11)
+// 4. TELEMATICS & IOT CONTRACTS (FR-11)
 // ============================================================================
 export interface VehicleLiveState {
   vehicleId: string;

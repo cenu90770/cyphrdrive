@@ -47,7 +47,7 @@ app.get(
   "/api/v1/admin/fleet/vehicles",
   authenticateToken,
   requireRole(["FLEET_ADMIN", "SUPER_ADMIN"]),
-  AdminController.getFleetVehilces,
+  AdminController.getFleetVehicles,
 );
 
 app.post(
