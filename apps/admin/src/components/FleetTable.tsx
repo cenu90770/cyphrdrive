@@ -16,7 +16,20 @@ interface TableProps {
   onSelectVehicle: (vehicle: FleetVehicle) => void;
 }
 
-type SortField = 'id' | 'ref' | 'brand' | 'model' | 'firstReg' | 'mileage' | 'status';
+// All columns except "Action" are sortable
+type SortField = 
+  | 'id' 
+  | 'ref' 
+  | 'brand' 
+  | 'model' 
+  | 'transmission' 
+  | 'fuel' 
+  | 'power' 
+  | 'firstReg' 
+  | 'mileage' 
+  | 'nextMaint' 
+  | 'status';
+
 type SortDirection = 'asc' | 'desc';
 
 export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) => {
@@ -45,18 +58,30 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
     }
   };
 
-  // Helper parser for mileages (e.g. "64.204 km" -> 64204)
+  // Helper: Parses numeric power in kW (e.g. "66 kW (90 hp)" -> 66)
+  const parsePower = (pStr?: string): number => {
+    if (!pStr) return 0;
+    const match = pStr.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 0;
+  };
+
+  // Helper: Parses mileage (e.g. "64.204 km" -> 64204)
   const parseMileage = (mStr?: string): number => {
     if (!mStr) return 0;
     return parseInt(mStr.replace(/[^\d]/g, ''), 10) || 0;
   };
 
-  // Helper parser for registration dates (e.g. "01.2024" -> 202401)
-  const parseRegDate = (dStr?: string): number => {
+  // Helper: Parses dates in either "MM.YYYY" or "DD.MM.YYYY" format into comparable integers
+  const parseDateString = (dStr?: string): number => {
     if (!dStr) return 0;
     const parts = dStr.split('.');
     if (parts.length === 2) {
-      return parseInt(parts[1] + parts[0], 10);
+      // MM.YYYY -> YYYYMM (e.g. "01.2024" -> 202401)
+      return parseInt(parts[1] + parts[0], 10) || 0;
+    }
+    if (parts.length === 3) {
+      // DD.MM.YYYY -> YYYYMMDD (e.g. "15.08.2026" -> 20260815)
+      return parseInt(parts[2] + parts[1] + parts[0], 10) || 0;
     }
     return 0;
   };
@@ -86,13 +111,29 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
           aVal = (a.model || '').toLowerCase();
           bVal = (b.model || '').toLowerCase();
           break;
+        case 'transmission':
+          aVal = (a.transmission || '').toLowerCase();
+          bVal = (b.transmission || '').toLowerCase();
+          break;
+        case 'fuel':
+          aVal = (a.fuel || '').toLowerCase();
+          bVal = (b.fuel || '').toLowerCase();
+          break;
+        case 'power':
+          aVal = parsePower(a.power);
+          bVal = parsePower(b.power);
+          break;
         case 'firstReg':
-          aVal = parseRegDate(a.firstReg);
-          bVal = parseRegDate(b.firstReg);
+          aVal = parseDateString(a.firstReg);
+          bVal = parseDateString(b.firstReg);
           break;
         case 'mileage':
           aVal = parseMileage(a.mileage);
           bVal = parseMileage(b.mileage);
+          break;
+        case 'nextMaint':
+          aVal = parseDateString(a.nextMaint);
+          bVal = parseDateString(b.nextMaint);
           break;
         case 'status':
           aVal = (a.status || '').toLowerCase();
@@ -150,7 +191,7 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
         <table className="w-full text-left text-xs text-slate-600">
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-400 font-semibold select-none">
             <tr>
-              {/* Sortable ID */}
+              {/* 1. ID */}
               <th 
                 className="py-3 px-4 cursor-pointer hover:text-slate-800 transition"
                 onClick={() => handleSort('id')}
@@ -158,7 +199,7 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
                 <div className="flex items-center">ID {renderSortIndicator('id')}</div>
               </th>
 
-              {/* Sortable Ref */}
+              {/* 2. Ref */}
               <th 
                 className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
                 onClick={() => handleSort('ref')}
@@ -166,7 +207,7 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
                 <div className="flex items-center">Ref. {renderSortIndicator('ref')}</div>
               </th>
 
-              {/* Sortable Brand */}
+              {/* 3. Brand */}
               <th 
                 className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
                 onClick={() => handleSort('brand')}
@@ -174,7 +215,7 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
                 <div className="flex items-center">Brand {renderSortIndicator('brand')}</div>
               </th>
 
-              {/* Sortable Model */}
+              {/* 4. Model */}
               <th 
                 className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
                 onClick={() => handleSort('model')}
@@ -182,11 +223,31 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
                 <div className="flex items-center">Model {renderSortIndicator('model')}</div>
               </th>
 
-              <th className="py-3 px-3">Transmission</th>
-              <th className="py-3 px-3">Fuel</th>
-              <th className="py-3 px-3">Power</th>
+              {/* 5. Transmission (Now Sortable) */}
+              <th 
+                className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
+                onClick={() => handleSort('transmission')}
+              >
+                <div className="flex items-center">Transmission {renderSortIndicator('transmission')}</div>
+              </th>
 
-              {/* Sortable First Reg */}
+              {/* 6. Fuel (Now Sortable) */}
+              <th 
+                className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
+                onClick={() => handleSort('fuel')}
+              >
+                <div className="flex items-center">Fuel {renderSortIndicator('fuel')}</div>
+              </th>
+
+              {/* 7. Power (Now Sortable) */}
+              <th 
+                className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
+                onClick={() => handleSort('power')}
+              >
+                <div className="flex items-center">Power {renderSortIndicator('power')}</div>
+              </th>
+
+              {/* 8. First reg. */}
               <th 
                 className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
                 onClick={() => handleSort('firstReg')}
@@ -194,7 +255,7 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
                 <div className="flex items-center">First reg. {renderSortIndicator('firstReg')}</div>
               </th>
 
-              {/* Sortable Mileage */}
+              {/* 9. Mileage */}
               <th 
                 className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
                 onClick={() => handleSort('mileage')}
@@ -202,9 +263,15 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
                 <div className="flex items-center">Mileage {renderSortIndicator('mileage')}</div>
               </th>
 
-              <th className="py-3 px-3">Next maint.</th>
+              {/* 10. Next maint. (Now Sortable) */}
+              <th 
+                className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
+                onClick={() => handleSort('nextMaint')}
+              >
+                <div className="flex items-center">Next maint. {renderSortIndicator('nextMaint')}</div>
+              </th>
 
-              {/* Sortable Status */}
+              {/* 11. Status */}
               <th 
                 className="py-3 px-3 cursor-pointer hover:text-slate-800 transition"
                 onClick={() => handleSort('status')}
@@ -212,6 +279,7 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
                 <div className="flex items-center">Status {renderSortIndicator('status')}</div>
               </th>
 
+              {/* 12. Action (Unsorted) */}
               <th className="py-3 px-3">Action</th>
               <th className="py-3 px-2"></th>
             </tr>
@@ -277,14 +345,12 @@ export const FleetTable: React.FC<TableProps> = ({ vehicles, onSelectVehicle }) 
         </table>
       </div>
 
-      {/* Bottom Bar: Item Range Counter (Left) & Pagination Buttons (Right) */}
+      {/* Bottom Bar: Range Counter & Working Pagination Controls */}
       <div className="py-3.5 px-6 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-        {/* Left: Exact "Showing 1-14 of 20 vehicles" text from screenshot */}
         <div className="font-mono text-slate-500">
           Showing {sortedVehicles.length === 0 ? '0' : `${startIndex + 1}-${endIndex}`} of {sortedVehicles.length} vehicles
         </div>
 
-        {/* Right: Working Pagination Controls matching screenshot << < 1 / 2 > >> */}
         <div className="flex items-center space-x-3 select-none">
           <button
             onClick={() => setCurrentPage(1)}
