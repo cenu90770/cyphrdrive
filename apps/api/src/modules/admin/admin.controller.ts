@@ -71,7 +71,7 @@ export class AdminController {
         ORDER BY COALESCE(v.specs->>'baySlot', '999') ASC, v.created_at DESC;
       `;
 
-      const result = await pool.query(query, params);
+      const result = await pool.query<FleetVehicle>(query, params);
       res.status(200).json({ count: result.rowCount, vehicles: result.rows });
     } catch (err: any) {
       console.error("[AdminController] Get Vehicles Error:", err);
