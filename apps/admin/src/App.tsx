@@ -139,7 +139,12 @@ export default function App() {
 
       {/* 2. Main Workspace Layout */}
       <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader breadcrumbs={getBreadcrumbs()} />
+        <AdminHeader 
+          breadcrumbs={getBreadcrumbs()} 
+          adminToken={adminToken}
+          onNavigateToBooking={() => setActiveTab('booking')}
+          onNavigateToTracking={() => setActiveTab('tracking')}
+        />
 
         <main className="p-8 ml-16 flex-1">
           {errorMessage && (
