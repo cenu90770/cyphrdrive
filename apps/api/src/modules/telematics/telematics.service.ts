@@ -95,6 +95,17 @@ export class TelematicsService {
         }),
       ],
     );
+
+    // Automatically generate critical telematics notification (FR-11.1)
+    await pool.query(
+      `INSERT INTO notifications (title, message, type, severity, read, resource_id)
+      VALUES ($1, $2, 'TELEMATICS', 'CRITICAL', FALSE, $3);`,
+      [
+        "🚨 Critical OBD-II Engine Alert",
+        `Critical diagnostic trouble codes [${criticalDetected.join(", ")}] detected on vehicle.`,
+        vehicleId,
+      ],
+    );
   }
 
   /**
