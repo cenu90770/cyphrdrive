@@ -23,8 +23,11 @@ export const ReturnCheckInModal: React.FC<ReturnModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const initialOdo = booking.current_odometer || 12450;
   const initialFuel = 100;
+  // Safe numeric parsing for odometer (handles e.g. 12450, "12 km", or "12.450 km")
+  const initialOdo = typeof booking.current_odometer === 'number'
+    ? booking.current_odometer
+    : parseInt(String(booking.current_odometer || '12450').replace(/[^\d]/g, ''), 10) || 12450;
 
   const [returnOdometer, setReturnOdometer] = useState<number>(initialOdo + 320);
   const [returnFuel, setReturnFuel] = useState<number>(85); // 85% returned

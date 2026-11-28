@@ -47,7 +47,7 @@ export class AdminController {
           END AS fuel,
           COALESCE(v.specs->>'power', '66 kW (90 hp)') AS power,
           COALESCE(v.specs->>'firstReg', TO_CHAR(v.created_at, 'MM.YYYY')) AS "firstReg",
-          COALESCE(v.specs->>'mileage', '12.450 km') AS mileage,
+          COALESCE(NULLIF(REGEXP_REPLACE(v.specs->>'mileage', '[^\d]', '', 'g'), ''), '12450')::int AS current_odometer,
           COALESCE(v.specs->>'nextMaintenance', '01.12.2027') AS "nextMaint",
           -- Prioritize exact CSV status (picked-up, booked, service, issue, available)
           COALESCE(
@@ -501,13 +501,13 @@ export class AdminController {
 
       if (status && status !== "all") {
         params.push(status.toString().toUpperCase());
-        whereClause += `  AND b.status = $${params.length}`;
+        whereClause += ` AND b.status = $${params.length}`;
       }
 
-      if (search) {
+      if (search && search.toString().trim().length > 0) {
         params.push(`%${search.toString().trim()}%`);
-        whereClause += `  AND (
-          b.booking_reference ILIKE $${params.length}
+        whereClause += ` AND (
+          b.booking_reference ILIKE $${params.length} 
           OR CONCAT(u.first_name, ' ', u.last_name) ILIKE $${params.length}
           OR v.license_plate ILIKE $${params.length}
           OR v.make ILIKE $${params.length}
@@ -534,7 +534,8 @@ export class AdminController {
           v.model as vehicle_model,
           v.license_plate as vehicle_plate,
           COALESCE(v.specs->>'vehicleRef', 'SB002') as vehicle_ref,
-          COALESCE(v.specs->>'mileage', '12450')::int as current_odometer,
+          -- Safely strips non-numeric characters before casting to int
+          COALESCE(NULLIF(REGEXP_REPLACE(v.specs->>'mileage', '[^\d]', '', 'g'), ''), '12450')::int AS current_odometer,
           br.name as pickup_branch_name
         FROM bookings b
         JOIN users u ON b.renter_id = u.id
